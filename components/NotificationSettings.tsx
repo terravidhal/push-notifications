@@ -62,6 +62,21 @@ export default function NotificationSettings() {
     fetchPreferences();
   }, []);
 
+  const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+      .replace(/\-/g, '+')
+      .replace(/_/g, '/');
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
   const subscribeToPushNotifications = async () => {
     try {
       // Request notification permission
@@ -70,18 +85,33 @@ export default function NotificationSettings() {
         throw new Error('Notification permission denied');
       }
 
-      // Register service worker
-      const registration = await navigator.serviceWorker.register('/service-worker.js', {
-        scope: '/'
-      });
-      
-      // Assure que le service worker est bien prêt
-       await navigator.serviceWorker.ready;
-      
+      let registration;
+      try {
+        // Unregister any existing service workers first
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(reg => reg.unregister()));
+
+        // Register new service worker
+        registration = await navigator.serviceWorker.register('/service-worker.js');
+        console.log('Service Worker registered successfully');
+      } catch (error) {
+        console.error('Service Worker registration failed:', error);
+        throw new Error('Failed to register service worker');
+      }
+
+      // Wait for the service worker to be ready
+      await navigator.serviceWorker.ready;
+      console.log('Service Worker is ready');
+
+      // Convert VAPID key to correct format
+      const applicationServerKey = urlBase64ToUint8Array(
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
+      );
+
       // Get push subscription
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+        applicationServerKey
       });
 
       // Send subscription to backend
