@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { COLLECTIONS } from '@/lib/models';
 
+
+
+
 export async function POST(req: Request) {
   try {
     const subscription = await req.json();
